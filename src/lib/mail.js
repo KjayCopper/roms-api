@@ -18,6 +18,9 @@ if (SMTP_HOST) {
   )
 }
 
+// True when a real SMTP transport is configured (exposed on /api/health).
+export const MAIL_ENABLED = Boolean(transporter)
+
 export async function sendMail({ to, subject, text, html }) {
   if (!transporter) {
     console.log(`[mail] would send to ${to}: ${subject}\n${text}`)

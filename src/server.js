@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import dns from 'node:dns/promises'
 import { pool, dbInfo } from './db.js'
 import { authenticate } from './lib/auth.js'
+import { MAIL_ENABLED } from './lib/mail.js'
 import { UPLOAD_DIR, PORT } from './lib/config.js'
 import authRoutes from './routes/authRoutes.js'
 import communityRoutes from './routes/communityRoutes.js'
@@ -69,10 +70,23 @@ app.get('/api/health', async (_req, res) => {
   try {
     await checkDB()
     dbReady = true
-    res.json({ ok: true, dbReady: true, db: target, resolved })
+    res.json({
+      ok: true,
+      dbReady: true,
+      db: target,
+      resolved,
+      mail: MAIL_ENABLED ? 'smtp' : 'log-only',
+    })
   } catch (err) {
     dbReady = false
-    res.json({ ok: true, dbReady: false, db: target, resolved, error: err.code || err.message })
+    res.json({
+      ok: true,
+      dbReady: false,
+      db: target,
+      resolved,
+      mail: MAIL_ENABLED ? 'smtp' : 'log-only',
+      error: err.code || err.message,
+    })
   }
 })
 
