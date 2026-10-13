@@ -103,7 +103,7 @@ export function defaultSite(community) {
           showLogo: true,
           heading: name,
           subheading: tagline,
-          align: 'center',
+          textAlign: 'center',
           buttons: [
             { label: 'Recruitment', href: '/recruitment', style: 'solid' },
             { label: 'Login', href: 'https://roms.kgmcloud.co.uk', style: 'soft' },
