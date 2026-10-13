@@ -99,6 +99,7 @@ export function defaultSite(community) {
         id: 'hero',
         type: 'hero',
         props: {
+          variant: 'centred',
           showLogo: true,
           heading: name,
           subheading: tagline,
@@ -113,16 +114,17 @@ export function defaultSite(community) {
         id: 'about',
         type: 'text',
         props: {
+          variant: 'plain',
           heading: 'About us',
           body: `Welcome to ${name}. This is your community's home on the web — tell people who you are, what you do and how to join.`,
           align: 'left',
-          wide: false,
         },
       },
       {
         id: 'features',
         type: 'features',
         props: {
+          variant: 'cards',
           heading: 'What we offer',
           items: [
             { title: 'Active community', text: 'Members online most evenings.' },
