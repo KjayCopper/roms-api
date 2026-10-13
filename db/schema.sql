@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS communities (
   logo_url     VARCHAR(255)    NULL,
   accent_color CHAR(7)         NULL,                -- e.g. #0b1f42
   theme        ENUM('light','dark') NOT NULL DEFAULT 'light', -- owner's pick, applied to all members
+  discord_url  VARCHAR(255)    NULL,                -- optional invite; shows a Join Discord button
   created_by   BIGINT UNSIGNED NULL,
   created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

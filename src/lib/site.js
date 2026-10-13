@@ -15,6 +15,7 @@
 
 // Content blocks a community can add. `header` and `footer` are edited
 // separately (they are structural, not part of the block list).
+// Recruitment is NOT here — it is its own fixed page (see /recruitment).
 export const BLOCK_TYPES = [
   'hero',        // big banner: heading, subheading, logo, buttons
   'text',        // heading + paragraph, optional image
@@ -24,11 +25,10 @@ export const BLOCK_TYPES = [
   'faq',         // accordion of { q, a }
   'cta',         // call to action with one button
   'socials',     // list of { label, href }
-  'recruitment', // locked — always present, cannot be removed
 ]
 
 // Types that cannot be deleted from a page.
-export const LOCKED_TYPES = ['recruitment']
+export const LOCKED_TYPES = []
 
 export const LOGO_STYLES = ['icon_text', 'logo_text', 'logo', 'icon', 'text']
 
@@ -89,7 +89,7 @@ export function defaultSite(community) {
       navColor: null, // null = follow the community accent colour
       links: [
         { label: 'Home', href: '/' },
-        { label: 'Recruitment', href: '#recruitment' },
+        { label: 'Recruitment', href: '/recruitment' },
       ],
       ctaLabel: 'Login',
       ctaHref: 'https://roms.kgmcloud.co.uk',
@@ -104,7 +104,7 @@ export function defaultSite(community) {
           subheading: tagline,
           align: 'center',
           buttons: [
-            { label: 'Recruitment', href: '#recruitment', style: 'solid' },
+            { label: 'Recruitment', href: '/recruitment', style: 'solid' },
             { label: 'Login', href: 'https://roms.kgmcloud.co.uk', style: 'soft' },
           ],
         },
@@ -129,15 +129,6 @@ export function defaultSite(community) {
             { title: 'Ranks & departments', text: 'A clear chain of command and room to progress.' },
             { title: 'Regular events', text: 'Weekly sessions and one-off specials.' },
           ],
-        },
-      },
-      {
-        id: 'recruitment',
-        type: 'recruitment',
-        props: {
-          heading: 'Recruitment',
-          body: 'Applications are open. Create an account on ROMS and apply to join — staff review every application.',
-          buttonLabel: 'Apply to join',
         },
       },
     ],

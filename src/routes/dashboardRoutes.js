@@ -446,6 +446,15 @@ router.patch(
       fields.theme = theme
     }
 
+    if (req.body?.discordUrl != null) {
+      const discord = String(req.body.discordUrl).trim()
+      if (discord && !/^https?:\/\/\S+$/i.test(discord)) {
+        throw badRequest('Enter a full link, e.g. https://discord.gg/abc123', { field: 'discordUrl' })
+      }
+      if (discord.length > 255) throw badRequest('That link is too long', { field: 'discordUrl' })
+      fields.discord_url = discord || null
+    }
+
     if (fields.name) {
       const taken = await one('SELECT id FROM communities WHERE name = ? AND id <> ?', [fields.name, req.community.id])
       if (taken) throw conflict('That community name is already taken', { field: 'name' })

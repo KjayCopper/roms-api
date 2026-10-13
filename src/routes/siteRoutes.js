@@ -1,18 +1,28 @@
 import { Router } from 'express'
+import crypto from 'node:crypto'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { pool, one } from '../db.js'
 import { editorContext, requireAuth, requirePermission, communityContext, signEditor } from '../lib/auth.js'
-import { asyncHandler, notFound, normaliseSlug, publicCommunity } from '../lib/util.js'
-import { SITE_DOMAIN } from '../lib/config.js'
+import { asyncHandler, badRequest, notFound, normaliseSlug, publicCommunity } from '../lib/util.js'
+import { SITE_DOMAIN, UPLOAD_DIR } from '../lib/config.js'
 import { defaultSite, parseSite, sanitiseSite } from '../lib/site.js'
 
 const router = Router()
 
 const PAGE = 'home'
 
+const LOGO_TYPES = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
 // The community that owns a public address, plus its page row.
 async function communityBySlug(value) {
   return one(
-    'SELECT id, slug, name, tagline, description, logo_url, accent_color, theme FROM communities WHERE slug = ?',
+    'SELECT id, slug, name, tagline, description, logo_url, accent_color, theme, discord_url FROM communities WHERE slug = ?',
     [normaliseSlug(value)],
   )
 }
@@ -168,6 +178,44 @@ router.post(
     ])
     const published = parseSite(page?.published) || defaultSite(req.community)
     res.json({ draft: published, hasUnpublishedChanges: false })
+  }),
+)
+
+// ---------------------------------------------------------------
+// POST /api/site/editor/logo   { dataUrl }  -> { community }
+//
+// The navbar logo IS the community logo (the same one the portal shows), so
+// uploading from the editor updates the community rather than the page. Pass
+// `dataUrl: null` to remove it. The page config is untouched.
+// ---------------------------------------------------------------
+router.post(
+  '/site/editor/logo',
+  editorContext,
+  requirePermission('community.settings'),
+  asyncHandler(async (req, res) => {
+    let url = null
+
+    if (req.body?.dataUrl) {
+      const match = /^data:(image\/[a-z+]+);base64,([A-Za-z0-9+/=]+)$/i.exec(String(req.body.dataUrl))
+      if (!match) throw badRequest('Provide an image as a data URL')
+
+      const ext = LOGO_TYPES[match[1].toLowerCase()]
+      if (!ext) throw badRequest('Only PNG, JPEG, WebP or GIF images are allowed')
+
+      const buffer = Buffer.from(match[2], 'base64')
+      if (buffer.length === 0) throw badRequest('The image is empty')
+      if (buffer.length > 2 * 1024 * 1024) throw badRequest('Image must be 2 MB or smaller')
+
+      const dir = path.join(UPLOAD_DIR, 'logos')
+      await fs.mkdir(dir, { recursive: true })
+      const filename = `${crypto.randomUUID()}.${ext}`
+      await fs.writeFile(path.join(dir, filename), buffer)
+      url = `/uploads/logos/${filename}`
+    }
+
+    await pool.query('UPDATE communities SET logo_url = ? WHERE id = ?', [url, req.community.id])
+    const community = await one('SELECT * FROM communities WHERE id = ?', [req.community.id])
+    res.json({ community: publicCommunity(community) })
   }),
 )
 

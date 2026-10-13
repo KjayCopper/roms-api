@@ -57,5 +57,6 @@ export function publicCommunity(c) {
     logoUrl: c.logo_url ?? null,
     accentColor: c.accent_color ?? null,
     theme: c.theme === 'dark' ? 'dark' : 'light',
+    discordUrl: c.discord_url ?? null,
   }
 }

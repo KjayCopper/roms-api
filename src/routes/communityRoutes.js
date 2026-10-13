@@ -159,7 +159,7 @@ router.get(
   '/communities/:slug',
   asyncHandler(async (req, res) => {
     const community = await one(
-      'SELECT id, slug, name, tagline, description, logo_url, accent_color, theme FROM communities WHERE slug = ?',
+      'SELECT id, slug, name, tagline, description, logo_url, accent_color, theme, discord_url FROM communities WHERE slug = ?',
       [normaliseSlug(req.params.slug)],
     )
     if (!community) throw notFound('Community not found')
