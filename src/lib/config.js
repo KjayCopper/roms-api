@@ -10,9 +10,12 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), 'up
 // Base URL of the portal, used to build invite links.
 export const PUBLIC_URL = (process.env.PUBLIC_URL || 'https://roms.kgmcloud.co.uk').replace(/\/+$/, '')
 
-// Accepts SMTP_FROM (preferred) or MAIL_FROM.
+// Accepts SMTP_FROM (preferred) or MAIL_FROM / EMAIL_FROM.
 export const MAIL_FROM =
-  process.env.SMTP_FROM || process.env.MAIL_FROM || 'KGM Cloud ROMS <no-reply@kgmcloud.co.uk>'
+  process.env.SMTP_FROM ||
+  process.env.MAIL_FROM ||
+  process.env.EMAIL_FROM ||
+  'KGM Cloud ROMS <noreply@kgmcloud.co.uk>'
 
 export const INVITE_TTL_MS = Number(process.env.INVITE_TTL_MS || 14 * 24 * 60 * 60 * 1000) // 14 days
 

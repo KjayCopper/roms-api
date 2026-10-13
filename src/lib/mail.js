@@ -1,20 +1,39 @@
 import nodemailer from 'nodemailer'
 import { MAIL_FROM, PUBLIC_URL } from './config.js'
 
-const { SMTP_HOST, SMTP_PORT = '587', SMTP_SECURE, SMTP_USER, SMTP_PASS } = process.env
+// Accept a few common spellings so the settings can be copied straight from
+// another app without renaming anything.
+const pick = (...names) =>
+  names.map((n) => process.env[n]).find((v) => v != null && v !== '')
+
+const SMTP_HOST = pick('SMTP_HOST', 'MAIL_HOST', 'EMAIL_HOST', 'SMTP_SERVER')
+const SMTP_PORT = pick('SMTP_PORT', 'MAIL_PORT', 'EMAIL_PORT') || '587'
+const SMTP_SECURE = pick('SMTP_SECURE', 'MAIL_SECURE', 'SMTP_SSL')
+const SMTP_USER = pick('SMTP_USER', 'SMTP_USERNAME', 'MAIL_USER', 'MAIL_USERNAME')
+const SMTP_PASS = pick('SMTP_PASS', 'SMTP_PASSWORD', 'MAIL_PASS', 'MAIL_PASSWORD')
 
 let transporter = null
 
 if (SMTP_HOST) {
+  const port = Number(SMTP_PORT)
+  const secure = String(SMTP_SECURE).toLowerCase() === 'true' || port === 465
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: String(SMTP_SECURE) === 'true' || Number(SMTP_PORT) === 465,
+    port,
+    secure,
     auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
   })
+  console.log(
+    `[mail] SMTP configured: ${SMTP_HOST}:${port} secure=${secure} user=${SMTP_USER || '(none)'} from=${MAIL_FROM}`,
+  )
+  // Proves the credentials work at boot, so a bad password is obvious.
+  transporter
+    .verify()
+    .then(() => console.log('[mail] SMTP login OK — mail can be sent'))
+    .catch((err) => console.error('[mail] SMTP login FAILED:', err.message))
 } else {
   console.log(
-    '[mail] SMTP_HOST not set — verification codes and invite links will be logged instead of emailed',
+    '[mail] No SMTP_HOST / MAIL_HOST set — verification codes and invite links will be logged instead of emailed',
   )
 }
 
@@ -27,6 +46,7 @@ export async function sendMail({ to, subject, text, html }) {
     return false
   }
   await transporter.sendMail({ from: MAIL_FROM, to, subject, text, html })
+  console.log(`[mail] sent "${subject}" to ${to}`)
   return true
 }
 
