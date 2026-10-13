@@ -199,9 +199,19 @@ router.post(
 
     const user = await one('SELECT id, email_verified FROM users WHERE email = ?', [email])
     if (user && !user.email_verified) {
-      const record = await one('SELECT created_at FROM email_verifications WHERE user_id = ?', [user.id])
-      if (record && Date.now() - new Date(record.created_at).getTime() < RESEND_COOLDOWN_MS) {
-        throw new HttpError(429, 'Please wait a moment before requesting another code', { code: 'cooldown' })
+      // Compare the timestamps inside MySQL so a timezone mismatch between the
+      // database and the container can never leave the cooldown stuck on.
+      const record = await one(
+        'SELECT TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age_seconds FROM email_verifications WHERE user_id = ?',
+        [user.id],
+      )
+      const cooldownSeconds = Math.ceil(RESEND_COOLDOWN_MS / 1000)
+      if (record && record.age_seconds != null && Number(record.age_seconds) < cooldownSeconds) {
+        const retryAfter = Math.max(1, cooldownSeconds - Number(record.age_seconds))
+        throw new HttpError(429, `Please wait ${retryAfter}s before requesting another code`, {
+          code: 'cooldown',
+          retryAfter,
+        })
       }
       const code = await issueVerificationCode(user.id)
       try {

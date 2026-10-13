@@ -13,7 +13,9 @@ if (SMTP_HOST) {
     auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
   })
 } else {
-  console.log('[mail] SMTP_HOST not set — invite links will be logged instead of emailed')
+  console.log(
+    '[mail] SMTP_HOST not set — verification codes and invite links will be logged instead of emailed',
+  )
 }
 
 export async function sendMail({ to, subject, text, html }) {
