@@ -14,6 +14,7 @@ import {
   conflict,
   forbidden,
   normaliseSlug,
+  isValidSlug,
   publicCommunity,
 } from '../lib/util.js'
 import { PERMISSIONS, effectivePermissions, sanitisePermissions } from '../lib/permissions.js'
@@ -416,6 +417,19 @@ router.patch(
       if (name.length < 3 || name.length > 100) throw badRequest('Name must be 3–100 characters', { field: 'name' })
       fields.name = name
     }
+
+    if (req.body?.slug != null) {
+      const slug = normaliseSlug(req.body.slug)
+      if (!isValidSlug(slug)) {
+        throw badRequest('Use 3–63 letters, numbers and hyphens', { field: 'slug' })
+      }
+      const reserved = await one('SELECT reason FROM reserved_slugs WHERE slug = ?', [slug])
+      if (reserved) throw conflict('That address is reserved', { field: 'slug', reason: reserved.reason })
+      const takenSlug = await one('SELECT id FROM communities WHERE slug = ? AND id <> ?', [slug, req.community.id])
+      if (takenSlug) throw conflict('That address is already taken', { field: 'slug' })
+      fields.slug = slug
+    }
+
     if (req.body?.tagline != null) fields.tagline = String(req.body.tagline).slice(0, 160) || null
     if (req.body?.description != null) fields.description = String(req.body.description) || null
     if (req.body?.logoUrl != null) fields.logo_url = String(req.body.logoUrl) || null
@@ -426,6 +440,11 @@ router.patch(
       }
       fields.accent_color = colour || null
     }
+    if (req.body?.theme != null) {
+      const theme = String(req.body.theme)
+      if (!['light', 'dark'].includes(theme)) throw badRequest('Theme must be light or dark', { field: 'theme' })
+      fields.theme = theme
+    }
 
     if (fields.name) {
       const taken = await one('SELECT id FROM communities WHERE name = ? AND id <> ?', [fields.name, req.community.id])
@@ -435,7 +454,15 @@ router.patch(
     const keys = Object.keys(fields)
     if (keys.length) {
       const setSql = keys.map((k) => `${k} = ?`).join(', ')
-      await pool.query(`UPDATE communities SET ${setSql} WHERE id = ?`, [...keys.map((k) => fields[k]), req.community.id])
+      try {
+        await pool.query(`UPDATE communities SET ${setSql} WHERE id = ?`, [
+          ...keys.map((k) => fields[k]),
+          req.community.id,
+        ])
+      } catch (err) {
+        if (err?.code === 'ER_DUP_ENTRY') throw conflict('That name or address is already taken')
+        throw err
+      }
     }
 
     const community = await one('SELECT * FROM communities WHERE id = ?', [req.community.id])

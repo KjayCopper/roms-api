@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS communities (
   description  TEXT            NULL,
   logo_url     VARCHAR(255)    NULL,
   accent_color CHAR(7)         NULL,                -- e.g. #0b1f42
+  theme        ENUM('light','dark') NOT NULL DEFAULT 'light', -- owner's pick, applied to all members
   created_by   BIGINT UNSIGNED NULL,
   created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

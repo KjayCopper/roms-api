@@ -37,24 +37,28 @@ router.get(
   asyncHandler(async (req, res) => {
     const name = String(req.query.name || '').trim()
     const slug = normaliseSlug(req.query.slug)
+    // The edit-community page passes its own slug so it is not blocked by itself.
+    const excludeSlug = normaliseSlug(req.query.excludeSlug)
     const out = { name: null, slug: null }
 
     if (name) {
-      const row = await one('SELECT id FROM communities WHERE name = ?', [name])
-      out.name = { value: name, available: !row }
+      const row = await one('SELECT id, slug FROM communities WHERE name = ?', [name])
+      const own = !!row && !!excludeSlug && normaliseSlug(row.slug) === excludeSlug
+      out.name = { value: name, available: !row || own }
     }
 
     if (slug) {
       const valid = isValidSlug(slug)
       const reserved = valid ? await one('SELECT reason FROM reserved_slugs WHERE slug = ?', [slug]) : null
       const taken = valid ? await one('SELECT id FROM communities WHERE slug = ?', [slug]) : null
+      const takenByOther = !!taken && slug !== excludeSlug
       out.slug = {
         value: slug,
         valid,
-        available: valid && !reserved && !taken,
+        available: valid && !reserved && !takenByOther,
         reserved: !!reserved,
         reason: reserved?.reason || null,
-        taken: !!taken,
+        taken: takenByOther,
       }
     }
 
@@ -146,7 +150,7 @@ router.get(
   '/communities/:slug',
   asyncHandler(async (req, res) => {
     const community = await one(
-      'SELECT id, slug, name, tagline, description, logo_url, accent_color FROM communities WHERE slug = ?',
+      'SELECT id, slug, name, tagline, description, logo_url, accent_color, theme FROM communities WHERE slug = ?',
       [normaliseSlug(req.params.slug)],
     )
     if (!community) throw notFound('Community not found')

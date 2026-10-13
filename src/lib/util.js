@@ -56,5 +56,6 @@ export function publicCommunity(c) {
     description: c.description ?? null,
     logoUrl: c.logo_url ?? null,
     accentColor: c.accent_color ?? null,
+    theme: c.theme === 'dark' ? 'dark' : 'light',
   }
 }
