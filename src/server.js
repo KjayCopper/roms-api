@@ -1,5 +1,6 @@
 import express from 'express'
 import fs from 'node:fs/promises'
+import dns from 'node:dns/promises'
 import { pool, dbInfo } from './db.js'
 import { authenticate } from './lib/auth.js'
 import { UPLOAD_DIR, PORT } from './lib/config.js'
@@ -16,19 +17,32 @@ let dbReady = false
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+async function checkDB() {
+  await pool.query('SELECT 1')
+}
+
+// Probe the database at boot and, if it is not reachable yet, keep retrying
+// in the background (every 10s, forever) until it answers. A DNS/network
+// problem at boot therefore no longer leaves the API stuck at "not ready".
 async function waitForDB() {
-  for (let attempt = 1; attempt <= 30; attempt++) {
+  let attempt = 0
+  for (;;) {
+    attempt++
     try {
-      await pool.query('SELECT 1')
-      dbReady = true
-      console.log(`Database ready (${dbInfo.host}:${dbInfo.port}/${dbInfo.database})`)
+      await checkDB()
+      if (!dbReady) {
+        dbReady = true
+        console.log(`Database reachable (${dbInfo.host}:${dbInfo.port}/${dbInfo.database})`)
+      }
       return
     } catch (err) {
-      console.log(`Database not ready (${err.code || err.message}) - retry ${attempt}/30`)
-      await sleep(3000)
+      dbReady = false
+      if (attempt <= 3 || attempt % 10 === 0) {
+        console.warn(`Database not reachable (${err.code || err.message}) - retry ${attempt}`)
+      }
+      await sleep(10000)
     }
   }
-  console.log('Giving up on database for now - the API will keep serving, auth will fail')
 }
 
 // ---------------------------------------------------------------
@@ -39,7 +53,28 @@ app.set('trust proxy', 1)
 app.use(express.json({ limit: '8mb' }))
 app.use(authenticate) // populates req.user when a session cookie/token is present
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, dbReady }))
+// Live health check: actually talks to the database on every request and
+// reports what the container's DNS resolves the DB host to. Open this in a
+// browser to diagnose a broken DB connection without needing a shell.
+app.get('/api/health', async (_req, res) => {
+  const target = `${dbInfo.host}:${dbInfo.port}/${dbInfo.database}`
+
+  let resolved
+  try {
+    resolved = (await dns.lookup(dbInfo.host)).address
+  } catch (err) {
+    resolved = `unresolved (${err.code || err.message})`
+  }
+
+  try {
+    await checkDB()
+    dbReady = true
+    res.json({ ok: true, dbReady: true, db: target, resolved })
+  } catch (err) {
+    dbReady = false
+    res.json({ ok: true, dbReady: false, db: target, resolved, error: err.code || err.message })
+  }
+})
 
 // Uploaded community logos etc.
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: '7d' }))
