@@ -1,17 +1,33 @@
 # For Cosmos: ServApps > Docker Compose > Import
-# CHANGE the DB_PASSWORD / JWT_SECRET values before importing!
+# CHANGE every CHANGE_ME value before importing!
 services:
   roms-api:
-    container_name: roms-api
+    container_name: romsapi
     image: ghcr.io/kjaycopper/roms-api:latest
     restart: unless-stopped
     environment:
       DB_HOST: kgm-mysqli
-      DB_PORT: "3306"
-      DB_NAME: scotlandrblx
+      DB_NAME: roms
       DB_USER: app
       DB_PASSWORD: CHANGE_ME_the_mysql_password_you_set
       JWT_SECRET: CHANGE_ME_a_long_random_string
-      SEED_USER: admin
-      SEED_PASS: roms123
+
+      # SMTP for invite emails
+      SMTP_HOST: CHANGE_ME_smtp_host
+      SMTP_PORT: "587"
+      SMTP_USER: CHANGE_ME_smtp_user
+      SMTP_PASS: CHANGE_ME_smtp_password
+      SMTP_FROM: "KGM Cloud ROMS <no-reply@kgmcloud.co.uk>"
+
+      # --- optional (defaults shown) ---
+      # DB_PORT: "3306"
+      # PUBLIC_URL: https://roms.kgmcloud.co.uk   # used to build invite links
+      # UPLOAD_DIR: /app/uploads                  # where logos are written
+      # SMTP_SECURE: "false"                      # auto: true when port 465
+    # Persistent storage for uploads - must be mounted at /app/uploads
+    volumes:
+      - roms-uploads:/app/uploads
     # No ports exposed - reached only via the frontend's /api proxy
+
+volumes:
+  roms-uploads:
