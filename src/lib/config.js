@@ -26,6 +26,11 @@ export const VERIFICATION_TTL_MS = Number(process.env.VERIFICATION_TTL_MS || 15 
 export const VERIFY_MAX_ATTEMPTS = Number(process.env.VERIFY_MAX_ATTEMPTS || 6)
 export const RESEND_COOLDOWN_MS = Number(process.env.RESEND_COOLDOWN_MS || 60 * 1000) // 60 seconds
 
+// Set LOG_VERIFICATION_CODES=true to also print codes to the log even when
+// SMTP is configured. Useful while email delivery is being set up — leave off
+// in production once mail works.
+export const LOG_CODES = String(process.env.LOG_VERIFICATION_CODES || '').toLowerCase() === 'true'
+
 // Secure cookies only over HTTPS (on by default in production).
 export const COOKIE_SECURE =
   process.env.COOKIE_SECURE != null

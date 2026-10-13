@@ -28,6 +28,7 @@ import {
   VERIFICATION_TTL_MS,
   VERIFY_MAX_ATTEMPTS,
   RESEND_COOLDOWN_MS,
+  LOG_CODES,
 } from '../lib/config.js'
 
 const router = Router()
@@ -128,6 +129,7 @@ router.post(
     }
 
     const code = await issueVerificationCode(userId)
+    if (LOG_CODES) console.log(`[auth] verification code for ${email}: ${code}`)
     let emailed = false
     try {
       emailed = await sendMail({ to: email, ...verificationEmail({ code, email }) })
@@ -214,6 +216,7 @@ router.post(
         })
       }
       const code = await issueVerificationCode(user.id)
+      if (LOG_CODES) console.log(`[auth] verification code for ${email}: ${code}`)
       try {
         await sendMail({ to: email, ...verificationEmail({ code, email }) })
       } catch (err) {
