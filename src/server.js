@@ -1,9 +1,10 @@
 import express from 'express'
 import fs from 'node:fs/promises'
 import dns from 'node:dns/promises'
+import { getServers } from 'node:dns'
 import { pool, dbInfo } from './db.js'
 import { authenticate } from './lib/auth.js'
-import { MAIL_ENABLED, SMTP_TARGET } from './lib/mail.js'
+import { MAIL_ENABLED, SMTP_TARGET, verifyMail } from './lib/mail.js'
 import { UPLOAD_DIR, PORT } from './lib/config.js'
 import authRoutes from './routes/authRoutes.js'
 import communityRoutes from './routes/communityRoutes.js'
@@ -15,6 +16,10 @@ import dashboardRoutes from './routes/dashboardRoutes.js'
 // hand via phpMyAdmin, see db/schema.sql)
 // ---------------------------------------------------------------
 let dbReady = false
+
+// Cached result of an on-demand SMTP login check (via /api/health?mail=1).
+let mailCheck = null
+let mailCheckAt = 0
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -57,7 +62,7 @@ app.use(authenticate) // populates req.user when a session cookie/token is prese
 // Live health check: actually talks to the database on every request and
 // reports what the container's DNS resolves the DB host to. Open this in a
 // browser to diagnose a broken DB connection without needing a shell.
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', async (req, res) => {
   const target = `${dbInfo.host}:${dbInfo.port}/${dbInfo.database}`
 
   let resolved
@@ -80,22 +85,33 @@ app.get('/api/health', async (_req, res) => {
   const mail = MAIL_ENABLED ? 'smtp' : 'log-only'
   const mailHost = SMTP_TARGET ? `${SMTP_TARGET.host}:${SMTP_TARGET.port}` : null
 
+  // ?mail=1 also performs a real SMTP login (cached 30s so it can't be hammered).
+  let mailVerify
+  if ('mail' in req.query && MAIL_ENABLED) {
+    if (!mailCheck || Date.now() - mailCheckAt > 30000) {
+      mailCheck = await verifyMail()
+      mailCheckAt = Date.now()
+    }
+    mailVerify = mailCheck
+  }
+
+  const extra = {
+    db: target,
+    resolved,
+    dnsServers: getServers(),
+    mail,
+    mailHost,
+    mailResolved,
+    ...(mailVerify ? { mailVerify } : {}),
+  }
+
   try {
     await checkDB()
     dbReady = true
-    res.json({ ok: true, dbReady: true, db: target, resolved, mail, mailHost, mailResolved })
+    res.json({ ok: true, dbReady: true, ...extra })
   } catch (err) {
     dbReady = false
-    res.json({
-      ok: true,
-      dbReady: false,
-      db: target,
-      resolved,
-      mail,
-      mailHost,
-      mailResolved,
-      error: err.code || err.message,
-    })
+    res.json({ ok: true, dbReady: false, ...extra, error: err.code || err.message })
   }
 })
 

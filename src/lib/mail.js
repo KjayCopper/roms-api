@@ -60,6 +60,17 @@ export async function sendMail({ to, subject, text, html }) {
   return true
 }
 
+// Used by /api/health?mail=1 to prove (or disprove) the SMTP login on demand.
+export async function verifyMail() {
+  if (!transporter) return { ok: false, error: 'no SMTP transport configured (log-only)' }
+  try {
+    await transporter.verify()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+}
+
 export function inviteEmail({ communityName, token, email }) {
   const link = `${PUBLIC_URL}/invite/${token}`
   const subject = `You've been invited to ${communityName} on KGM Cloud ROMS`
