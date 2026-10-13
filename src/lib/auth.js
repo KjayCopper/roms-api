@@ -2,6 +2,7 @@ import crypto from 'node:crypto'
 import {
   COOKIE_SECURE,
   COMMUNITY_COOKIE,
+  EDITOR_TTL_MS,
   SESSION_COOKIE,
   SESSION_TTL_MS,
 } from './config.js'
@@ -81,6 +82,11 @@ export const signSession = (userId) =>
 export const signCommunity = (communityId) =>
   sign({ typ: 'community', cid: communityId, exp: Date.now() + SESSION_TTL_MS })
 
+// Handed to the community's own subdomain so its site editor can talk back to
+// the API (the portal's session cookie is host-only and cannot travel there).
+export const signEditor = (userId, communityId) =>
+  sign({ typ: 'editor', sub: userId, cid: communityId, exp: Date.now() + EDITOR_TTL_MS })
+
 // ---------------------------------------------------------------
 // Cookies
 // ---------------------------------------------------------------
@@ -136,6 +142,22 @@ export function requireAuth(req, _res, next) {
   next()
 }
 
+// Like requireAuth, but also accepts a community-site editor token (the editor
+// runs on the community's subdomain and has no portal cookie).
+export const requireAnyAuth = asyncHandler(async (req, _res, next) => {
+  if (req.user) return next()
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  const data = verify(bearer)
+  if (data?.typ === 'editor') {
+    const user = await loadUser(data.sub)
+    if (user) {
+      req.user = user
+      return next()
+    }
+  }
+  next(unauthorized('You must be logged in'))
+})
+
 // Resolves the selected community (from the signed community cookie) and the
 // caller's membership + effective permissions. Must run after authenticate.
 export const communityContext = asyncHandler(async (req, _res, next) => {
@@ -143,6 +165,14 @@ export const communityContext = asyncHandler(async (req, _res, next) => {
   if (!data || data.typ !== 'community') return next(forbidden('No community selected'))
   const community = await one('SELECT * FROM communities WHERE id = ?', [data.cid])
   if (!community) return next(forbidden('No community selected'))
+  const membership = await loadMembership(req.user.id, community.id)
+  if (!membership) return next(forbidden('You are not a member of this community'))
+  attachContext(req, community, membership)
+  next()
+})
+
+// Active membership of a community, with the role joined on.
+export async function loadMembership(userId, communityId) {
   const membership = await one(
     `SELECT m.id, m.user_id, m.community_id, m.role_id, m.display_name, m.status,
             r.key AS role_key, r.name AS role_name, r.position AS role_position,
@@ -150,11 +180,13 @@ export const communityContext = asyncHandler(async (req, _res, next) => {
        FROM memberships m
        LEFT JOIN roles r ON r.id = m.role_id
       WHERE m.user_id = ? AND m.community_id = ?`,
-    [req.user.id, community.id],
+    [userId, communityId],
   )
-  if (!membership || membership.status !== 'active') {
-    return next(forbidden('You are not a member of this community'))
-  }
+  if (!membership || membership.status !== 'active') return null
+  return membership
+}
+
+function attachContext(req, community, membership) {
   req.community = community
   req.membership = membership
   req.role = membership.role_id
@@ -168,6 +200,28 @@ export const communityContext = asyncHandler(async (req, _res, next) => {
       }
     : null
   req.permissions = effectivePermissions({ is_owner: membership.is_owner, permissions: membership.permissions })
+}
+
+// Community-site editor authentication. The editor is served from the
+// community's own subdomain, so it carries a signed editor token as a bearer
+// token instead of the portal's host-only session cookie.
+export const editorContext = asyncHandler(async (req, _res, next) => {
+  const bearer = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  const data = verify(bearer)
+  const expired = unauthorized('Editor session expired — reopen the editor from the dashboard')
+  if (!data || data.typ !== 'editor') return next(expired)
+
+  const user = await loadUser(data.sub)
+  if (!user) return next(expired)
+  const community = await one('SELECT * FROM communities WHERE id = ?', [data.cid])
+  if (!community) return next(expired)
+
+  // Permissions are re-checked on every request; the token only proves who.
+  const membership = await loadMembership(user.id, community.id)
+  if (!membership) return next(forbidden('You are not a member of this community'))
+
+  req.user = user
+  attachContext(req, community, membership)
   next()
 })
 

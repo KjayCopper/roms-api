@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pool, one, query, withTransaction } from '../db.js'
-import { requireAuth, setCommunity, clearCommunity, signCommunity } from '../lib/auth.js'
+import { requireAuth, requireAnyAuth, setCommunity, clearCommunity, signCommunity } from '../lib/auth.js'
 import {
   asyncHandler,
   badRequest,
@@ -16,6 +16,7 @@ import {
 } from '../lib/util.js'
 import { PRESET_ROLES } from '../lib/permissions.js'
 import { UPLOAD_DIR } from '../lib/config.js'
+import { defaultSite } from '../lib/site.js'
 
 const router = Router()
 
@@ -130,6 +131,14 @@ router.post(
           [req.user.id, id, ownerRoleId, req.user.username || req.user.email],
         )
 
+        // Every community starts with a default website, already published.
+        const site = JSON.stringify(defaultSite({ id, slug, name }))
+        await conn.query(
+          `INSERT INTO community_pages (community_id, page_slug, draft, published, published_at)
+           VALUES (?, 'home', ?, ?, NOW())`,
+          [id, site, site],
+        )
+
         return id
       })
     } catch (err) {
@@ -191,12 +200,11 @@ router.post(
 
 // ---------------------------------------------------------------
 // POST /api/uploads/logo   { dataUrl }  -> { url }
+// POST /api/uploads/image  { dataUrl }  -> { url }
 // (no multipart dependency; the client sends a data: URL)
 // ---------------------------------------------------------------
-router.post(
-  '/uploads/logo',
-  requireAuth,
-  asyncHandler(async (req, res) => {
+function imageUploader(subdir) {
+  return asyncHandler(async (req, res) => {
     const dataUrl = String(req.body?.dataUrl || '')
     const match = /^data:(image\/[a-z+]+);base64,([A-Za-z0-9+/=]+)$/i.exec(dataUrl)
     if (!match) throw badRequest('Provide an image as a data URL')
@@ -208,14 +216,17 @@ router.post(
     if (buffer.length === 0) throw badRequest('The image is empty')
     if (buffer.length > 2 * 1024 * 1024) throw badRequest('Image must be 2 MB or smaller')
 
-    const dir = path.join(UPLOAD_DIR, 'logos')
+    const dir = path.join(UPLOAD_DIR, subdir)
     await fs.mkdir(dir, { recursive: true })
     const filename = `${crypto.randomUUID()}.${ext}`
     await fs.writeFile(path.join(dir, filename), buffer)
 
-    res.status(201).json({ url: `/uploads/logos/${filename}` })
-  }),
-)
+    res.status(201).json({ url: `/uploads/${subdir}/${filename}` })
+  })
+}
+
+router.post('/uploads/logo', requireAnyAuth, imageUploader('logos'))
+router.post('/uploads/image', requireAnyAuth, imageUploader('images'))
 
 // ---------------------------------------------------------------
 // POST /api/community/select   { communityId }  -> sets the cookie

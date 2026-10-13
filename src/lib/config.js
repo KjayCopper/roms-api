@@ -21,6 +21,13 @@ export const INVITE_TTL_MS = Number(process.env.INVITE_TTL_MS || 14 * 24 * 60 * 
 
 export const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MS || 7 * 24 * 60 * 60 * 1000) // 7 days
 
+// The site editor runs on the community's own subdomain and authenticates with
+// a bearer token, so it needs its own (much shorter) lifetime.
+export const EDITOR_TTL_MS = Number(process.env.EDITOR_TTL_MS || 12 * 60 * 60 * 1000) // 12 hours
+
+// Base domain of community sites (scotland.kgmcloud.co.uk etc).
+export const SITE_DOMAIN = process.env.SITE_DOMAIN || 'kgmcloud.co.uk'
+
 // Sign-up email verification
 export const VERIFICATION_TTL_MS = Number(process.env.VERIFICATION_TTL_MS || 15 * 60 * 1000) // 15 minutes
 export const VERIFY_MAX_ATTEMPTS = Number(process.env.VERIFY_MAX_ATTEMPTS || 6)

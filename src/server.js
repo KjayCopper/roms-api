@@ -10,6 +10,7 @@ import authRoutes from './routes/authRoutes.js'
 import communityRoutes from './routes/communityRoutes.js'
 import inviteRoutes from './routes/inviteRoutes.js'
 import dashboardRoutes from './routes/dashboardRoutes.js'
+import siteRoutes from './routes/siteRoutes.js'
 
 // ---------------------------------------------------------------
 // DB readiness (does NOT create tables — the schema is applied by
@@ -122,6 +123,7 @@ app.use('/api', authRoutes)
 app.use('/api', communityRoutes)
 app.use('/api', inviteRoutes)
 app.use('/api', dashboardRoutes)
+app.use('/api', siteRoutes)
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }))
 

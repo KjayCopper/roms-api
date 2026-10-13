@@ -209,3 +209,22 @@ CREATE TABLE IF NOT EXISTS email_verifications (
   CONSTRAINT fk_email_verifications_user FOREIGN KEY (user_id)
     REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Community website pages — the site editor's draft/published
+-- layout. A default layout is published when a community is made.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS community_pages (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  community_id BIGINT UNSIGNED NOT NULL,
+  page_slug    VARCHAR(63)     NOT NULL DEFAULT 'home',
+  draft        JSON            NOT NULL,
+  published    JSON            NOT NULL,
+  published_at DATETIME        NULL,
+  created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_community_pages (community_id, page_slug),
+  CONSTRAINT fk_community_pages_community FOREIGN KEY (community_id)
+    REFERENCES communities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
