@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import dns from 'node:dns/promises'
 import { pool, dbInfo } from './db.js'
 import { authenticate } from './lib/auth.js'
-import { MAIL_ENABLED } from './lib/mail.js'
+import { MAIL_ENABLED, SMTP_TARGET } from './lib/mail.js'
 import { UPLOAD_DIR, PORT } from './lib/config.js'
 import authRoutes from './routes/authRoutes.js'
 import communityRoutes from './routes/communityRoutes.js'
@@ -67,16 +67,23 @@ app.get('/api/health', async (_req, res) => {
     resolved = `unresolved (${err.code || err.message})`
   }
 
+  // Can the container resolve the mail server's hostname at all?
+  let mailResolved = null
+  if (SMTP_TARGET) {
+    try {
+      mailResolved = (await dns.lookup(SMTP_TARGET.host)).address
+    } catch (err) {
+      mailResolved = `unresolved (${err.code || err.message})`
+    }
+  }
+
+  const mail = MAIL_ENABLED ? 'smtp' : 'log-only'
+  const mailHost = SMTP_TARGET ? `${SMTP_TARGET.host}:${SMTP_TARGET.port}` : null
+
   try {
     await checkDB()
     dbReady = true
-    res.json({
-      ok: true,
-      dbReady: true,
-      db: target,
-      resolved,
-      mail: MAIL_ENABLED ? 'smtp' : 'log-only',
-    })
+    res.json({ ok: true, dbReady: true, db: target, resolved, mail, mailHost, mailResolved })
   } catch (err) {
     dbReady = false
     res.json({
@@ -84,7 +91,9 @@ app.get('/api/health', async (_req, res) => {
       dbReady: false,
       db: target,
       resolved,
-      mail: MAIL_ENABLED ? 'smtp' : 'log-only',
+      mail,
+      mailHost,
+      mailResolved,
       error: err.code || err.message,
     })
   }

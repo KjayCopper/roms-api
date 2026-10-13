@@ -14,17 +14,22 @@ const SMTP_PASS = pick('SMTP_PASS', 'SMTP_PASSWORD', 'MAIL_PASS', 'MAIL_PASSWORD
 
 let transporter = null
 
+const smtpPort = Number(SMTP_PORT)
+const smtpSecure = String(SMTP_SECURE).toLowerCase() === 'true' || smtpPort === 465
+
 if (SMTP_HOST) {
-  const port = Number(SMTP_PORT)
-  const secure = String(SMTP_SECURE).toLowerCase() === 'true' || port === 465
   transporter = nodemailer.createTransport({
     host: SMTP_HOST,
-    port,
-    secure,
+    port: smtpPort,
+    secure: smtpSecure,
     auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+    // Fail fast (15s) instead of hanging silently for minutes on a blocked port.
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   })
   console.log(
-    `[mail] SMTP configured: ${SMTP_HOST}:${port} secure=${secure} user=${SMTP_USER || '(none)'} from=${MAIL_FROM}`,
+    `[mail] SMTP configured: ${SMTP_HOST}:${smtpPort} secure=${smtpSecure} user=${SMTP_USER || '(none)'} from=${MAIL_FROM}`,
   )
   // Proves the credentials work at boot, so a bad password is obvious.
   transporter
@@ -39,6 +44,11 @@ if (SMTP_HOST) {
 
 // True when a real SMTP transport is configured (exposed on /api/health).
 export const MAIL_ENABLED = Boolean(transporter)
+
+// Where mail is pointed, exposed on /api/health for troubleshooting.
+export const SMTP_TARGET = SMTP_HOST
+  ? { host: SMTP_HOST, port: smtpPort, secure: smtpSecure }
+  : null
 
 export async function sendMail({ to, subject, text, html }) {
   if (!transporter) {
