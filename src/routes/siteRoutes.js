@@ -6,7 +6,7 @@ import { pool, one } from '../db.js'
 import { editorContext, requireAuth, requirePermission, communityContext, signEditor } from '../lib/auth.js'
 import { asyncHandler, badRequest, notFound, normaliseSlug, publicCommunity } from '../lib/util.js'
 import { SITE_DOMAIN, UPLOAD_DIR } from '../lib/config.js'
-import { defaultSite, parseSite, sanitiseSite } from '../lib/site.js'
+import { defaultSite, migrateSite, parseSite, sanitiseSite } from '../lib/site.js'
 
 const router = Router()
 
@@ -56,7 +56,7 @@ router.get(
       community.id,
       PAGE,
     ])
-    res.json({ site: parseSite(page?.published) || defaultSite(community) })
+    res.json({ site: migrateSite(parseSite(page?.published) || defaultSite(community), community) })
   }),
 )
 
@@ -92,8 +92,8 @@ router.get(
       'SELECT draft, published, published_at, updated_at FROM community_pages WHERE community_id = ? AND page_slug = ?',
       [req.community.id, PAGE],
     )
-    const published = parseSite(page?.published) || defaultSite(req.community)
-    const draft = parseSite(page?.draft) || published
+    const published = migrateSite(parseSite(page?.published) || defaultSite(req.community), req.community)
+    const draft = migrateSite(parseSite(page?.draft) || published, req.community)
     res.json({
       community: publicCommunity(req.community),
       permissions: req.permissions,
@@ -114,7 +114,7 @@ router.patch(
   editorContext,
   requirePermission('community.settings'),
   asyncHandler(async (req, res) => {
-    const site = sanitiseSite(req.body?.site)
+    const site = sanitiseSite(req.body?.site, req.community)
     const json = JSON.stringify(site)
     const fallback = JSON.stringify(defaultSite(req.community))
 
@@ -129,7 +129,7 @@ router.patch(
       req.community.id,
       PAGE,
     ])
-    const published = parseSite(page?.published) || defaultSite(req.community)
+    const published = migrateSite(parseSite(page?.published) || defaultSite(req.community), req.community)
 
     res.json({ draft: site, hasUnpublishedChanges: JSON.stringify(site) !== JSON.stringify(published) })
   }),
@@ -154,7 +154,7 @@ router.post(
       'SELECT draft, published, published_at FROM community_pages WHERE community_id = ? AND page_slug = ?',
       [req.community.id, PAGE],
     )
-    const published = parseSite(page?.published) || defaultSite(req.community)
+    const published = migrateSite(parseSite(page?.published) || defaultSite(req.community), req.community)
     res.json({ published, publishedAt: page?.published_at || null, hasUnpublishedChanges: false })
   }),
 )
@@ -176,7 +176,7 @@ router.post(
       req.community.id,
       PAGE,
     ])
-    const published = parseSite(page?.published) || defaultSite(req.community)
+    const published = migrateSite(parseSite(page?.published) || defaultSite(req.community), req.community)
     res.json({ draft: published, hasUnpublishedChanges: false })
   }),
 )

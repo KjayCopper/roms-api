@@ -4,19 +4,21 @@
 // A site is one JSON document:
 //
 //   {
-//     version: 1,
+//     version: 2,
 //     header:  { logoStyle, navColor, links: [{ label, kind, href|page }] },
 //     blocks:  [{ id, type, props: {...} }],        // the home page
 //     pages:   [{ slug, title, blocks: [...] }],    // custom pages
 //     footer:  { text, links: [{ label, kind, href|page }] }
 //   }
 //
+// `version` lets stored documents be migrated in place (see migrateSite).
 // The editor writes `draft`; visitors only ever see `published`.
 // ---------------------------------------------------------------
 
 // Content blocks a community can add. `header` and `footer` are edited
 // separately (they are structural, not part of the block list).
-// Recruitment is NOT here — it is its own fixed page (see /recruitment).
+// Recruitment is NOT here — it ships as an editable starter page, so a
+// community can rename, restyle or delete it like any other page.
 export const BLOCK_TYPES = [
   'hero',        // big banner: heading, subheading, logo, buttons
   'text',        // heading + paragraph, optional image
@@ -37,7 +39,7 @@ export const MAX_BLOCKS = 60
 export const MAX_PAGES = 20
 
 // Addresses the fixed routes and infrastructure already own.
-const RESERVED_PAGE_SLUGS = ['home', 'editor', 'recruitment', 'api', 'uploads', 'www']
+const RESERVED_PAGE_SLUGS = ['home', 'editor', 'api', 'uploads', 'www']
 
 const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 
@@ -148,21 +150,66 @@ function pages(input) {
   return out
 }
 
+// The starter "Recruitment" page every community gets next to its home page.
+// It is an ordinary custom page: renamable, editable and deletable. Its call to
+// action hands off to the central application form, which knows which
+// community the applicant is joining.
+function recruitmentPage(community) {
+  const name = community?.name || 'Our community'
+  const slug = community?.slug
+  const applyUrl = slug
+    ? `https://roms.kgmcloud.co.uk/register?community=${encodeURIComponent(slug)}`
+    : 'https://roms.kgmcloud.co.uk/register'
+
+  return {
+    slug: 'recruitment',
+    title: 'Recruitment',
+    blocks: [
+      {
+        id: 'recruitment-hero',
+        type: 'hero',
+        props: {
+          variant: 'centred',
+          showLogo: true,
+          heading: 'Recruitment',
+          subheading: `${name} is recruiting. Applications are open to anyone who wants to join.`,
+          textAlign: 'center',
+          buttons: [{ label: 'Apply to join', href: applyUrl, style: 'solid' }],
+        },
+      },
+      {
+        id: 'recruitment-steps',
+        type: 'features',
+        props: {
+          variant: 'cards',
+          heading: 'How to apply',
+          items: [
+            { title: 'Create your ROMS account', text: 'Sign up with your email address and verify it.' },
+            { title: 'Send your application', text: 'Tell us a little about yourself and why you want to join.' },
+            { title: 'Wait to hear back', text: 'Our staff review every application and will be in touch.' },
+          ],
+        },
+      },
+    ],
+  }
+}
+
 // A brand-new community's page. Looks like the ROMS placeholder site,
-// but already carries the community's name and tagline.
+// but already carries the community's name and tagline. It has two pages:
+// Home (the fixed layout) and Recruitment (an editable starter page).
 export function defaultSite(community) {
   const name = community?.name || 'Our community'
   const tagline = community?.tagline || 'A Roblox roleplay community on ROMS.'
 
   return {
-    version: 1,
+    version: 2,
     header: {
       logoStyle: 'icon_text',
       logoUrl: null, // navbar logo; null = use the community logo
       navColor: null, // null = follow the community accent colour
       links: [
         { label: 'Home', kind: 'url', href: '/' },
-        { label: 'Recruitment', kind: 'url', href: '/recruitment' },
+        { label: 'Recruitment', kind: 'page', page: 'recruitment' },
       ],
     },
     blocks: [
@@ -205,7 +252,7 @@ export function defaultSite(community) {
         },
       },
     ],
-    pages: [],
+    pages: [recruitmentPage(community)],
     footer: {
       text: `© ${name}. Powered by KGM Cloud ROMS.`,
       links: [],
@@ -213,9 +260,27 @@ export function defaultSite(community) {
   }
 }
 
+// Bring an older saved site forward. v1 had the recruitment page baked into
+// the application as a fixed route; v2 stores it as a normal custom page so
+// communities can edit it. Safe to call repeatedly — it only ever adds the
+// page once, and never after a community has deleted it (those documents are
+// already marked v2).
+export function migrateSite(site, community) {
+  const src = site && typeof site === 'object' ? site : {}
+  if ((Number(src.version) || 1) >= 2) return src
+
+  const pages = Array.isArray(src.pages) ? [...src.pages] : []
+  if (!pages.some((p) => normalisePageSlug(p?.slug) === 'recruitment')) {
+    pages.push(recruitmentPage(community))
+  }
+  return { ...src, version: 2, pages }
+}
+
 // Validate + normalise anything the editor sends before it is stored.
-export function sanitiseSite(input) {
-  const src = input && typeof input === 'object' ? input : {}
+// `community` is optional but lets us bring an old document forward first.
+export function sanitiseSite(input, community) {
+  const base = input && typeof input === 'object' ? input : {}
+  const src = base.header || base.blocks || base.pages || base.footer ? migrateSite(base, community) : base
 
   const header = {
     logoStyle: LOGO_STYLES.includes(src.header?.logoStyle) ? src.header.logoStyle : 'icon_text',
@@ -225,7 +290,7 @@ export function sanitiseSite(input) {
   }
 
   return {
-    version: 1,
+    version: 2,
     header,
     blocks: cleanBlocks(src.blocks),
     pages: pages(src.pages),
