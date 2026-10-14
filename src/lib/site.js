@@ -86,6 +86,7 @@ export function defaultSite(community) {
     version: 1,
     header: {
       logoStyle: 'icon_text',
+      logoUrl: null, // navbar logo; null = use the community logo
       navColor: null, // null = follow the community accent colour
       links: [
         { label: 'Home', href: '/' },
@@ -147,6 +148,7 @@ export function sanitiseSite(input) {
 
   const header = {
     logoStyle: LOGO_STYLES.includes(src.header?.logoStyle) ? src.header.logoStyle : 'icon_text',
+    logoUrl: str(src.header?.logoUrl, 800),
     navColor: isHex(src.header?.navColor) ? src.header.navColor : null,
     links: links(src.header?.links, 8),
     ctaLabel: str(src.header?.ctaLabel, 40),
