@@ -5,9 +5,10 @@
 //
 //   {
 //     version: 1,
-//     header:  { logoStyle, navColor, links: [{label, href}], cta: {label, href} },
-//     blocks:  [{ id, type, props: {...} }],
-//     footer:  { text, links: [{label, href}] }
+//     header:  { logoStyle, navColor, links: [{ label, kind, href|page }] },
+//     blocks:  [{ id, type, props: {...} }],        // the home page
+//     pages:   [{ slug, title, blocks: [...] }],    // custom pages
+//     footer:  { text, links: [{ label, kind, href|page }] }
 //   }
 //
 // The editor writes `draft`; visitors only ever see `published`.
@@ -33,6 +34,10 @@ export const LOCKED_TYPES = []
 export const LOGO_STYLES = ['icon_text', 'logo_text', 'logo', 'icon', 'text']
 
 export const MAX_BLOCKS = 60
+export const MAX_PAGES = 20
+
+// Addresses the fixed routes and infrastructure already own.
+const RESERVED_PAGE_SLUGS = ['home', 'editor', 'recruitment', 'api', 'uploads', 'www']
 
 const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 
@@ -68,12 +73,79 @@ function clean(value, depth = 0) {
   return null
 }
 
-function links(list, max = 8) {
+// Header/footer links. A link is either an external URL or a link to one of
+// the site's own pages ({{ label, kind: 'page', page }}).
+function links(list, max = 10) {
   if (!Array.isArray(list)) return []
-  return list
-    .slice(0, max)
-    .map((l) => ({ label: str(l?.label, 60), href: str(l?.href, 400) }))
-    .filter((l) => l.label && l.href)
+  const out = []
+  for (const raw of list.slice(0, max)) {
+    const label = str(raw?.label, 60)
+    if (!label) continue
+    if (raw?.kind === 'page') {
+      const page = normalisePageSlug(raw?.page)
+      if (!page) continue
+      out.push({ label, kind: 'page', page })
+    } else {
+      const href = str(raw?.href, 400)
+      if (!href) continue
+      out.push({ label, kind: 'url', href })
+    }
+  }
+  return out
+}
+
+// A page's address in the URL: lowercase words joined by hyphens.
+function normalisePageSlug(value) {
+  return (
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 63) || null
+  )
+}
+
+// Validate + normalise a page's block list (shared by the home page and any
+// custom page).
+function cleanBlocks(input) {
+  const blocks = []
+  const seen = new Set()
+  const list = Array.isArray(input) ? input.slice(0, MAX_BLOCKS) : []
+
+  for (const raw of list) {
+    const type = String(raw?.type || '')
+    if (!BLOCK_TYPES.includes(type)) continue
+
+    let id = String(raw?.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)
+    if (!id || seen.has(id)) id = `${type}-${blocks.length + 1}`
+    seen.add(id)
+
+    blocks.push({ id, type, props: clean(raw?.props) || {} })
+  }
+
+  // Locked blocks can never be removed.
+  for (const type of LOCKED_TYPES) {
+    if (!blocks.some((b) => b.type === type)) blocks.push({ id: type, type, props: {} })
+  }
+
+  return blocks
+}
+
+// Custom pages, each with a unique, non-reserved address.
+function pages(input) {
+  const out = []
+  const seen = new Set(['home'])
+  for (const raw of (Array.isArray(input) ? input : []).slice(0, MAX_PAGES)) {
+    const slug = normalisePageSlug(raw?.slug)
+    if (!slug || seen.has(slug) || RESERVED_PAGE_SLUGS.includes(slug)) continue
+    seen.add(slug)
+    out.push({
+      slug,
+      title: str(raw?.title, 60) || slug,
+      blocks: cleanBlocks(raw?.blocks),
+    })
+  }
+  return out
 }
 
 // A brand-new community's page. Looks like the ROMS placeholder site,
@@ -89,11 +161,9 @@ export function defaultSite(community) {
       logoUrl: null, // navbar logo; null = use the community logo
       navColor: null, // null = follow the community accent colour
       links: [
-        { label: 'Home', href: '/' },
-        { label: 'Recruitment', href: '/recruitment' },
+        { label: 'Home', kind: 'url', href: '/' },
+        { label: 'Recruitment', kind: 'url', href: '/recruitment' },
       ],
-      ctaLabel: 'Login',
-      ctaHref: 'https://roms.kgmcloud.co.uk',
     },
     blocks: [
       {
@@ -135,6 +205,7 @@ export function defaultSite(community) {
         },
       },
     ],
+    pages: [],
     footer: {
       text: `© ${name}. Powered by KGM Cloud ROMS.`,
       links: [],
@@ -150,42 +221,17 @@ export function sanitiseSite(input) {
     logoStyle: LOGO_STYLES.includes(src.header?.logoStyle) ? src.header.logoStyle : 'icon_text',
     logoUrl: str(src.header?.logoUrl, 800),
     navColor: isHex(src.header?.navColor) ? src.header.navColor : null,
-    links: links(src.header?.links, 8),
-    ctaLabel: str(src.header?.ctaLabel, 40),
-    ctaHref: str(src.header?.ctaHref, 400),
-  }
-  if (!header.ctaLabel || !header.ctaHref) {
-    header.ctaLabel = null
-    header.ctaHref = null
-  }
-
-  const blocks = []
-  const seen = new Set()
-  const input_blocks = Array.isArray(src.blocks) ? src.blocks.slice(0, MAX_BLOCKS) : []
-
-  for (const raw of input_blocks) {
-    const type = String(raw?.type || '')
-    if (!BLOCK_TYPES.includes(type)) continue
-
-    let id = String(raw?.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40)
-    if (!id || seen.has(id)) id = `${type}-${blocks.length + 1}`
-    seen.add(id)
-
-    blocks.push({ id, type, props: clean(raw?.props) || {} })
-  }
-
-  // Locked blocks can never be removed.
-  for (const type of LOCKED_TYPES) {
-    if (!blocks.some((b) => b.type === type)) blocks.push({ id: type, type, props: {} })
+    links: links(src.header?.links),
   }
 
   return {
     version: 1,
     header,
-    blocks,
+    blocks: cleanBlocks(src.blocks),
+    pages: pages(src.pages),
     footer: {
       text: str(src.footer?.text, 400),
-      links: links(src.footer?.links, 8),
+      links: links(src.footer?.links),
     },
   }
 }
