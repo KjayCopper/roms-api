@@ -27,7 +27,7 @@ export const BLOCK_TYPES = [
   'gallery',     // grid of images
   'faq',         // accordion of { q, a }
   'cta',         // call to action with one button
-  'socials',     // list of { label, href }
+  'socials',     // list of { platform, label, href }
 ]
 
 // Types that cannot be deleted from a page.
