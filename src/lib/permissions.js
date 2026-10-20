@@ -8,6 +8,8 @@
 export const PERMISSIONS = [
   'community.settings', // rename, logo, accent colour, tagline
   'community.roles',    // create/edit/delete roles
+  'services.view',      // see the community's services
+  'services.manage',    // create/edit services, ranks and departments
   'members.view',
   'members.manage',     // assign roles, remove members
   'applications.view',
