@@ -156,7 +156,7 @@ function vacancyView(row) {
   return {
     id: row.id,
     publicRef: row.public_ref ?? null,
-    applicationUrl: row.public_ref ? `/application/${row.public_ref}` : null,
+    applicationUrl: row.public_ref ? `/vacancy/${row.public_ref}` : null,
     title: row.title,
     description: row.description ?? null,
     audience: row.audience,
@@ -251,7 +251,7 @@ async function publicCommunityBySlug(value) {
 function publicVacancyView(row) {
   return {
     ref: row.public_ref,
-    applicationUrl: `/application/${row.public_ref}`,
+    applicationUrl: `/vacancy/${row.public_ref}`,
     title: row.title,
     description: row.description ?? null,
     closesAt: row.closes_at ?? null,
@@ -811,13 +811,13 @@ router.get(
 )
 
 // ---------------------------------------------------------------
-// GET /api/communities/:slug/application/:ref
+// GET /api/communities/:slug/vacancy/:ref
 //
-// The public application page. The reference is the only thing in
+// The public vacancy page. The reference is the only thing in
 // the address, so the numeric id is never published.
 // ---------------------------------------------------------------
 router.get(
-  '/communities/:slug/application/:ref',
+  '/communities/:slug/vacancy/:ref',
   asyncHandler(async (req, res) => {
     const community = await publicCommunityBySlug(req.params.slug)
     if (!community) throw notFound('Community not found')
@@ -838,10 +838,10 @@ router.get(
 )
 
 // ---------------------------------------------------------------
-// POST /api/communities/:slug/application/:ref/apply
+// POST /api/communities/:slug/vacancy/:ref/apply
 // ---------------------------------------------------------------
 router.post(
-  '/communities/:slug/application/:ref/apply',
+  '/communities/:slug/vacancy/:ref/apply',
   asyncHandler(async (req, res) => {
     const community = await publicCommunityBySlug(req.params.slug)
     if (!community) throw notFound('Community not found')

@@ -40,8 +40,8 @@ export const MAX_BLOCKS = 60
 export const MAX_PAGES = 20
 
 // Addresses the fixed routes and infrastructure already own.
-// 'application' is the public application page (/application/<reference>).
-const RESERVED_PAGE_SLUGS = ['home', 'editor', 'api', 'uploads', 'www', 'application']
+// 'vacancy' is the public vacancy page (/vacancy/<reference>).
+const RESERVED_PAGE_SLUGS = ['home', 'editor', 'api', 'uploads', 'www', 'vacancy', 'application']
 
 const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 
