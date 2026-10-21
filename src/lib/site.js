@@ -17,17 +17,18 @@
 
 // Content blocks a community can add. `header` and `footer` are edited
 // separately (they are structural, not part of the block list).
-// Recruitment is NOT here — it ships as an editable starter page, so a
-// community can rename, restyle or delete it like any other page.
+// The editable Recruitment starter page is a normal custom page; the
+// Applications block is the piece that lists external vacancies on it.
 export const BLOCK_TYPES = [
-  'hero',        // big banner: heading, subheading, logo, buttons
-  'text',        // heading + paragraph, optional image
-  'features',    // grid of { title, text }
-  'stats',       // grid of { label, value }
-  'gallery',     // grid of images
-  'faq',         // accordion of { q, a }
-  'cta',         // call to action with one button
-  'socials',     // list of { platform, label, href }
+  'hero',         // big banner: heading, subheading, logo, buttons
+  'text',         // heading + paragraph, optional image
+  'features',     // grid of { title, text }
+  'stats',        // grid of { label, value }
+  'gallery',      // grid of images
+  'faq',          // accordion of { q, a }
+  'cta',          // call to action with one button
+  'socials',      // list of { platform, label, href }
+  'applications', // public recruitment vacancies + application form
 ]
 
 // Types that cannot be deleted from a page.
