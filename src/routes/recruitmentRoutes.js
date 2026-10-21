@@ -43,12 +43,21 @@ const MAX_MESSAGE = 4000
 const SANITIZE_OPTIONS = {
   allowedTags: [
     'p', 'br', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li',
-    'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'hr',
+    'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'hr', 'img',
   ],
   allowedAttributes: {
     a: ['href', 'target', 'rel'],
+    img: ['src', 'alt', 'width', 'height'],
   },
   allowedSchemes: ['http', 'https', 'mailto'],
+  transformTags: {
+    img: (tagName, attribs) => {
+      const src = String(attribs.src || '')
+      // Only images we served ourselves may be embedded.
+      if (!src.startsWith('/uploads/')) return false
+      return { tagName, attribs }
+    },
+  },
 }
 
 function cleanDescription(value) {
