@@ -11,6 +11,7 @@ import communityRoutes from './routes/communityRoutes.js'
 import inviteRoutes from './routes/inviteRoutes.js'
 import dashboardRoutes from './routes/dashboardRoutes.js'
 import serviceRoutes from './routes/serviceRoutes.js'
+import serviceAdminRoutes from './routes/serviceAdminRoutes.js'
 import siteRoutes from './routes/siteRoutes.js'
 
 // ---------------------------------------------------------------
@@ -125,6 +126,7 @@ app.use('/api', communityRoutes)
 app.use('/api', inviteRoutes)
 app.use('/api', dashboardRoutes)
 app.use('/api', serviceRoutes)
+app.use('/api', serviceAdminRoutes)
 app.use('/api', siteRoutes)
 
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }))

@@ -1,7 +1,8 @@
 import { Router } from 'express'
 import { pool, one, query } from '../db.js'
 import { requireAuth, communityContext, requirePermission } from '../lib/auth.js'
-import { asyncHandler, badRequest, conflict, notFound } from '../lib/util.js'
+import { asyncHandler, badRequest, conflict, forbidden, notFound } from '../lib/util.js'
+import { serviceAccess } from '../lib/serviceAccess.js'
 
 // Community services (Police, Ambulance, Fire, ...). Departments, ranks and
 // applications will hang off these later.
@@ -152,9 +153,13 @@ router.patch(
   '/dashboard/services/:id',
   requireAuth,
   ctx,
-  requirePermission('services.manage'),
   asyncHandler(async (req, res) => {
-    const service = await findService(req.community.id, req.params.id)
+    // Community managers can edit any service. A service head can edit their
+    // own service through the services.manage permission on their rank.
+    const access = await serviceAccess(req, req.params.id)
+    if (!access) throw notFound('Service not found')
+    if (!access.canManage) throw forbidden('Missing permission: services.manage')
+    const { service } = access
 
     const name = req.body?.name != null ? readName(req.body.name) : service.name
     if (name !== service.name) {

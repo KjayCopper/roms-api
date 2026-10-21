@@ -17,7 +17,13 @@ import {
   isValidSlug,
   publicCommunity,
 } from '../lib/util.js'
-import { PERMISSIONS, effectivePermissions, sanitisePermissions } from '../lib/permissions.js'
+import {
+  PERMISSIONS,
+  effectivePermissions,
+  sanitisePermissions,
+  parsePermissions,
+} from '../lib/permissions.js'
+import { serviceSummary } from '../lib/serviceAccess.js'
 import { sendMail, inviteEmail } from '../lib/mail.js'
 import { INVITE_TTL_MS } from '../lib/config.js'
 
@@ -48,10 +54,83 @@ router.get(
   requireAuth,
   ctx,
   asyncHandler(async (req, res) => {
+    const global = new Set(req.permissions)
+    const canSeeAllServices = global.has('services.view') || global.has('services.manage')
+
+    // Community managers see every service; everyone else sees the services
+    // they belong to. The LEFT JOIN keeps non-members for managers.
+    const serviceRows = await query(
+      `SELECT s.id, s.name, s.slug, s.description, s.colour, s.position,
+              sm.id AS membership_id, sm.department_id, sm.rank_id,
+              d.name AS department_name, d.slug AS department_slug,
+              r.name AS rank_name, r.position AS rank_position,
+              r.permissions AS rank_permissions
+         FROM services s
+         LEFT JOIN service_members sm
+           ON sm.service_id = s.id AND sm.membership_id = ?
+         LEFT JOIN departments d ON d.id = sm.department_id
+         LEFT JOIN ranks r ON r.id = sm.rank_id
+        WHERE s.community_id = ? AND (sm.id IS NOT NULL OR ? = 1)
+        ORDER BY s.position ASC, s.name ASC`,
+      [req.membership.id, req.community.id, canSeeAllServices ? 1 : 0],
+    )
+
+    const serviceIds = serviceRows.map((service) => service.id)
+    let departmentRows = []
+    if (serviceIds.length) {
+      departmentRows = await query(
+        `SELECT id, service_id, name, slug, position
+           FROM departments
+          WHERE service_id IN (${serviceIds.map(() => '?').join(',')})
+          ORDER BY position ASC, name ASC`,
+        serviceIds,
+      )
+    }
+
+    const departmentsByService = new Map()
+    for (const department of departmentRows) {
+      if (!departmentsByService.has(department.service_id)) {
+        departmentsByService.set(department.service_id, [])
+      }
+      departmentsByService.get(department.service_id).push(department)
+    }
+
+    const services = serviceRows.map((row) => {
+      const isMember = !!row.membership_id
+      const serviceWide = isMember && row.department_id == null
+      const rankPermissions = parsePermissions(row.rank_permissions)
+      const matches = (key) => global.has(key) || (isMember && rankPermissions.includes(key))
+      const matchesWide = (key) =>
+        global.has(key) || (isMember && serviceWide && rankPermissions.includes(key))
+
+      const access = {
+        service: row,
+        membership: isMember
+          ? {
+              id: row.membership_id,
+              departmentId: row.department_id,
+              departmentName: row.department_name,
+              departmentSlug: row.department_slug,
+              rankId: row.rank_id,
+              rankName: row.rank_name,
+            }
+          : null,
+        isMember,
+        rankPermissions,
+        canViewAll: canSeeAllServices || serviceWide,
+        canManage: matchesWide('services.manage'),
+        canManageMembers: matches('members.manage'),
+        canManageServiceWideMembers: matchesWide('members.manage'),
+      }
+
+      return serviceSummary(access, departmentsByService.get(row.id) || [])
+    })
+
     res.json({
       community: publicCommunity(req.community),
       role: req.role,
       permissions: req.permissions,
+      services,
     })
   }),
 )

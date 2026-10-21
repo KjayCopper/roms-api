@@ -18,6 +18,23 @@ export const PERMISSIONS = [
 
 export const ALL_PERMISSIONS = [...PERMISSIONS]
 
+// Permissions that can be attached to a service rank. Community-wide
+// permissions (settings, roles) deliberately aren't delegable through a rank.
+export const RANK_PERMISSION_OPTIONS = [
+  { key: 'services.view', label: 'View the service', group: 'Service' },
+  {
+    key: 'services.manage',
+    label: 'Manage settings, departments and ranks',
+    group: 'Service',
+  },
+  { key: 'members.view', label: 'View the service roster', group: 'Members' },
+  { key: 'members.manage', label: 'Add members and assign ranks', group: 'Members' },
+  { key: 'applications.view', label: 'View recruitment applications', group: 'Recruitment' },
+  { key: 'applications.manage', label: 'Manage recruitment applications', group: 'Recruitment' },
+]
+
+export const RANK_PERMISSIONS = RANK_PERMISSION_OPTIONS.map((option) => option.key)
+
 export const PRESET_ROLES = [
   {
     key: 'owner',
@@ -54,7 +71,7 @@ export const PRESET_ROLES = [
 ]
 
 // mysql2 may hand back JSON columns already parsed, or as a string.
-function parsePermissions(value) {
+export function parsePermissions(value) {
   if (Array.isArray(value)) return value
   if (typeof value === 'string') {
     try {
@@ -77,4 +94,10 @@ export function effectivePermissions(role) {
 export function sanitisePermissions(list) {
   if (!Array.isArray(list)) return []
   return [...new Set(list.filter((p) => PERMISSIONS.includes(p)))]
+}
+
+// Rank permissions are a narrower set than community permissions.
+export function sanitiseRankPermissions(list) {
+  if (!Array.isArray(list)) return []
+  return [...new Set(list.filter((p) => RANK_PERMISSIONS.includes(p)))]
 }
