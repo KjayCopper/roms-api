@@ -5,6 +5,7 @@
 // to a vacancy and can be reviewed by community, service or department staff.
 import { Router } from 'express'
 import crypto from 'node:crypto'
+import sanitizeHtml from 'sanitize-html'
 import { pool, one, query } from '../db.js'
 import { requireAuth, communityContext } from '../lib/auth.js'
 import {
@@ -36,6 +37,30 @@ const REVIEW_STATUSES = ['shortlisted', 'accepted', 'rejected']
 const MAX_TITLE = 120
 const MAX_DESCRIPTION = 5000
 const MAX_MESSAGE = 4000
+
+// Vacancy descriptions are rich text (HTML). Keep only a safe subset so a
+// manager cannot inject scripts that run on the public site.
+const SANITIZE_OPTIONS = {
+  allowedTags: [
+    'p', 'br', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li',
+    'h2', 'h3', 'h4', 'blockquote', 'code', 'pre', 'hr',
+  ],
+  allowedAttributes: {
+    a: ['href', 'target', 'rel'],
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+}
+
+function cleanDescription(value) {
+  if (value == null || value === '') return null
+  const html = sanitizeHtml(String(value), SANITIZE_OPTIONS).trim()
+  if (html.length > MAX_DESCRIPTION * 4) {
+    throw badRequest('Description is too long', { field: 'description' })
+  }
+  // Collapse an empty editor (<p></p>) to null.
+  if (!html || html === '<p></p>') return null
+  return html
+}
 
 // Public application links use a random reference instead of the numeric id,
 // so the id is never published and the links cannot be guessed.
@@ -479,7 +504,7 @@ router.post(
     }
 
     const title = readText(req.body?.title, 'Title', MAX_TITLE, { required: true })
-    const description = readText(req.body?.description, 'Description', MAX_DESCRIPTION)
+    const description = cleanDescription(req.body?.description)
     const audience = readEnum(req.body?.audience, AUDIENCES, 'internal', 'audience')
     const status = readEnum(req.body?.status, VACANCY_STATUSES, 'open', 'status')
     const closesAt = readDate(req.body?.closesAt)
@@ -561,7 +586,7 @@ router.patch(
         : existing.title
     const description =
       req.body?.description !== undefined
-        ? readText(req.body.description, 'Description', MAX_DESCRIPTION)
+        ? cleanDescription(req.body.description)
         : existing.description
     const audience =
       req.body?.audience !== undefined
