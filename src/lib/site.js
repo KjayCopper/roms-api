@@ -40,7 +40,8 @@ export const MAX_BLOCKS = 60
 export const MAX_PAGES = 20
 
 // Addresses the fixed routes and infrastructure already own.
-const RESERVED_PAGE_SLUGS = ['home', 'editor', 'api', 'uploads', 'www']
+// 'application' is the public application page (/application/<reference>).
+const RESERVED_PAGE_SLUGS = ['home', 'editor', 'api', 'uploads', 'www', 'application']
 
 const isHex = (v) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
 
@@ -189,6 +190,17 @@ function recruitmentPage(community) {
             { title: 'Send your application', text: 'Tell us a little about yourself and why you want to join.' },
             { title: 'Wait to hear back', text: 'Our staff review every application and will be in touch.' },
           ],
+        },
+      },
+      {
+        // The live vacancy board: filtered by service, three cards to a row.
+        id: 'recruitment-applications',
+        type: 'applications',
+        props: {
+          heading: 'Open vacancies',
+          body: 'Browse the roles we are recruiting for and apply online.',
+          showFilters: true,
+          columns: '3',
         },
       },
     ],

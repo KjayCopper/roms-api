@@ -4,6 +4,7 @@
 // which is the public request-to-join flow. Recruitment applications belong
 // to a vacancy and can be reviewed by community, service or department staff.
 import { Router } from 'express'
+import crypto from 'node:crypto'
 import { pool, one, query } from '../db.js'
 import { requireAuth, communityContext } from '../lib/auth.js'
 import {
@@ -35,6 +36,20 @@ const REVIEW_STATUSES = ['shortlisted', 'accepted', 'rejected']
 const MAX_TITLE = 120
 const MAX_DESCRIPTION = 5000
 const MAX_MESSAGE = 4000
+
+// Public application links use a random reference instead of the numeric id,
+// so the id is never published and the links cannot be guessed.
+const PUBLIC_REF_PATTERN = /^[a-f0-9]{32}$/
+
+function newPublicRef() {
+  return crypto.randomBytes(16).toString('hex')
+}
+
+function readPublicRef(value) {
+  const ref = String(value ?? '').trim().toLowerCase()
+  if (!PUBLIC_REF_PATTERN.test(ref)) throw notFound('Vacancy not found')
+  return ref
+}
 
 function readText(value, label, max, { required = false } = {}) {
   const text = String(value ?? '').trim()
@@ -120,10 +135,11 @@ async function readPlacement(communityId, { serviceId, departmentId, rankId }) {
 }
 
 const VACANCY_SELECT = `
-  SELECT v.id, v.community_id, v.service_id, v.department_id, v.rank_id,
+  SELECT v.id, v.public_ref, v.community_id, v.service_id, v.department_id, v.rank_id,
          v.title, v.description, v.audience, v.status, v.closes_at,
          v.created_at, v.updated_at,
          s.name AS service_name, s.slug AS service_slug, s.colour AS service_colour,
+         s.logo_url AS service_logo,
          d.name AS department_name, d.slug AS department_slug,
          r.name AS rank_name, r.position AS rank_position,
          (SELECT COUNT(*) FROM recruitment_applications a
@@ -139,6 +155,8 @@ const VACANCY_SELECT = `
 function vacancyView(row) {
   return {
     id: row.id,
+    publicRef: row.public_ref ?? null,
+    applicationUrl: row.public_ref ? `/application/${row.public_ref}` : null,
     title: row.title,
     description: row.description ?? null,
     audience: row.audience,
@@ -152,6 +170,7 @@ function vacancyView(row) {
           name: row.service_name,
           slug: row.service_slug,
           colour: row.service_colour ?? null,
+          logoUrl: row.service_logo ?? null,
         }
       : null,
     department: row.department_id
@@ -170,6 +189,7 @@ const APPLICATION_SELECT = `
          v.title AS vacancy_title, v.status AS vacancy_status, v.audience AS vacancy_audience,
          v.service_id, v.department_id, v.rank_id,
          s.name AS service_name, s.slug AS service_slug, s.colour AS service_colour,
+         s.logo_url AS service_logo,
          d.name AS department_name, d.slug AS department_slug,
          r.name AS rank_name, r.position AS rank_position
     FROM recruitment_applications a
@@ -199,6 +219,7 @@ function applicationView(row) {
             name: row.service_name,
             slug: row.service_slug,
             colour: row.service_colour ?? null,
+            logoUrl: row.service_logo ?? null,
           }
         : null,
       department: row.department_id
@@ -229,21 +250,38 @@ async function publicCommunityBySlug(value) {
 
 function publicVacancyView(row) {
   return {
-    id: row.id,
+    ref: row.public_ref,
+    applicationUrl: `/application/${row.public_ref}`,
     title: row.title,
     description: row.description ?? null,
     closesAt: row.closes_at ?? null,
+    open: row.is_open === undefined ? true : !!Number(row.is_open),
     service: row.service_id
       ? {
           name: row.service_name,
           slug: row.service_slug,
           colour: row.service_colour ?? null,
+          logoUrl: row.service_logo ?? null,
         }
       : null,
     department: row.department_id ? { name: row.department_name } : null,
     rank: row.rank_id ? { name: row.rank_name } : null,
   }
 }
+
+// The public list and the public application page read the same columns.
+const PUBLIC_VACANCY_SELECT = `
+  SELECT v.public_ref, v.title, v.description, v.closes_at,
+         v.service_id, v.department_id, v.rank_id, v.audience, v.status,
+         (v.status = 'open' AND (v.closes_at IS NULL OR v.closes_at >= NOW())) AS is_open,
+         s.name AS service_name, s.slug AS service_slug, s.colour AS service_colour,
+         s.logo_url AS service_logo,
+         d.name AS department_name,
+         r.name AS rank_name
+    FROM recruitment_vacancies v
+    LEFT JOIN services s ON s.id = v.service_id
+    LEFT JOIN departments d ON d.id = v.department_id
+    LEFT JOIN ranks r ON r.id = v.rank_id`
 
 function canManageAny(req, assignments) {
   return (
@@ -448,10 +486,11 @@ router.post(
 
     const [result] = await pool.query(
       `INSERT INTO recruitment_vacancies
-         (community_id, service_id, department_id, rank_id, title, description,
+         (public_ref, community_id, service_id, department_id, rank_id, title, description,
           audience, status, closes_at, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        newPublicRef(),
         req.community.id,
         placement.service?.id ?? null,
         placement.department?.id ?? null,
@@ -758,15 +797,7 @@ router.get(
     if (!community) throw notFound('Community not found')
 
     const rows = await query(
-      `SELECT v.id, v.title, v.description, v.closes_at,
-              v.service_id, v.department_id, v.rank_id,
-              s.name AS service_name, s.slug AS service_slug, s.colour AS service_colour,
-              d.name AS department_name,
-              r.name AS rank_name
-         FROM recruitment_vacancies v
-         LEFT JOIN services s ON s.id = v.service_id
-         LEFT JOIN departments d ON d.id = v.department_id
-         LEFT JOIN ranks r ON r.id = v.rank_id
+      `${PUBLIC_VACANCY_SELECT}
         WHERE v.community_id = ?
           AND v.status = 'open'
           AND v.audience IN ('external', 'both')
@@ -779,19 +810,52 @@ router.get(
   }),
 )
 
-router.post(
-  '/communities/:slug/vacancies/:id/apply',
+// ---------------------------------------------------------------
+// GET /api/communities/:slug/application/:ref
+//
+// The public application page. The reference is the only thing in
+// the address, so the numeric id is never published.
+// ---------------------------------------------------------------
+router.get(
+  '/communities/:slug/application/:ref',
   asyncHandler(async (req, res) => {
     const community = await publicCommunityBySlug(req.params.slug)
     if (!community) throw notFound('Community not found')
+    const ref = readPublicRef(req.params.ref)
+
+    const row = await one(`${PUBLIC_VACANCY_SELECT} WHERE v.public_ref = ? AND v.community_id = ?`, [
+      ref,
+      community.id,
+    ])
+    if (!row) throw notFound('Vacancy not found')
+    // Internal-only and draft vacancies are never published.
+    if (row.audience === 'internal' || row.status === 'draft') {
+      throw notFound('Vacancy not found')
+    }
+
+    res.json({ vacancy: publicVacancyView(row) })
+  }),
+)
+
+// ---------------------------------------------------------------
+// POST /api/communities/:slug/application/:ref/apply
+// ---------------------------------------------------------------
+router.post(
+  '/communities/:slug/application/:ref/apply',
+  asyncHandler(async (req, res) => {
+    const community = await publicCommunityBySlug(req.params.slug)
+    if (!community) throw notFound('Community not found')
+    const ref = readPublicRef(req.params.ref)
 
     const vacancy = await one(
-      `SELECT id FROM recruitment_vacancies
-        WHERE id = ? AND community_id = ?
-          AND status = 'open'
-          AND audience IN ('external', 'both')
-          AND (closes_at IS NULL OR closes_at >= NOW())`,
-      [req.params.id, community.id],
+      `SELECT v.id
+         FROM recruitment_vacancies v
+        WHERE v.public_ref = ?
+          AND v.community_id = ?
+          AND v.status = 'open'
+          AND v.audience IN ('external', 'both')
+          AND (v.closes_at IS NULL OR v.closes_at >= NOW())`,
+      [ref, community.id],
     )
     if (!vacancy) throw notFound('Vacancy not found or no longer open')
 

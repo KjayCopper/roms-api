@@ -14,7 +14,7 @@ const MAX_DESCRIPTION = 500
 const isHexColour = (v) => /^#[0-9a-fA-F]{6}$/.test(v)
 
 const SELECT_COLUMNS =
-  'id, name, slug, description, colour, position, created_at, updated_at'
+  'id, name, slug, description, colour, logo_url, position, created_at, updated_at'
 
 function serviceView(service) {
   return {
@@ -23,6 +23,7 @@ function serviceView(service) {
     slug: service.slug,
     description: service.description ?? null,
     colour: service.colour ?? null,
+    logoUrl: service.logo_url ?? null,
     position: service.position,
     createdAt: service.created_at,
     updatedAt: service.updated_at,
@@ -80,6 +81,20 @@ function readColour(value) {
   return colour
 }
 
+// A logo is always an uploaded file, so it has to be a path we served
+// ourselves. Anything else is rejected.
+function readLogoUrl(value) {
+  if (value == null || value === '') return null
+  const url = String(value).trim()
+  if (url.length > 255) {
+    throw badRequest('That logo path is too long', { field: 'logoUrl' })
+  }
+  if (!url.startsWith('/uploads/')) {
+    throw badRequest('Logo must be an uploaded image', { field: 'logoUrl' })
+  }
+  return url
+}
+
 async function findService(communityId, id) {
   const service = await one('SELECT * FROM services WHERE id = ? AND community_id = ?', [
     id,
@@ -121,6 +136,7 @@ router.post(
     const name = readName(req.body?.name)
     const description = readDescription(req.body?.description)
     const colour = readColour(req.body?.colour)
+    const logoUrl = readLogoUrl(req.body?.logoUrl)
 
     const existing = await one('SELECT id FROM services WHERE community_id = ? AND name = ?', [
       req.community.id,
@@ -135,9 +151,9 @@ router.post(
     )
 
     const [result] = await pool.query(
-      `INSERT INTO services (community_id, name, slug, description, colour, position)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [req.community.id, name, slug, description, colour, next.position],
+      `INSERT INTO services (community_id, name, slug, description, colour, logo_url, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.community.id, name, slug, description, colour, logoUrl, next.position],
     )
     const service = await one(`SELECT ${SELECT_COLUMNS} FROM services WHERE id = ?`, [
       result.insertId,
@@ -173,13 +189,13 @@ router.patch(
     const description =
       req.body?.description !== undefined ? readDescription(req.body.description) : service.description
     const colour = req.body?.colour !== undefined ? readColour(req.body.colour) : service.colour
+    const logoUrl =
+      req.body?.logoUrl !== undefined ? readLogoUrl(req.body.logoUrl) : service.logo_url
 
-    await pool.query('UPDATE services SET name = ?, description = ?, colour = ? WHERE id = ?', [
-      name,
-      description,
-      colour,
-      service.id,
-    ])
+    await pool.query(
+      'UPDATE services SET name = ?, description = ?, colour = ?, logo_url = ? WHERE id = ?',
+      [name, description, colour, logoUrl, service.id],
+    )
 
     const updated = await one(`SELECT ${SELECT_COLUMNS} FROM services WHERE id = ?`, [service.id])
     res.json({ service: serviceView(updated) })

@@ -100,6 +100,7 @@ export function serviceSummary(access, departments) {
     slug: access.service.slug,
     description: access.service.description ?? null,
     colour: access.service.colour ?? null,
+    logoUrl: access.service.logo_url ?? null,
     position: access.service.position,
     isMember: access.isMember,
     membership: access.membership

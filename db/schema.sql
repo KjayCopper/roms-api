@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS services (
   slug         VARCHAR(63)     NOT NULL,            -- stable key, e.g. roads-policing
   description  VARCHAR(500)    NULL,
   colour       CHAR(7)         NULL,                -- optional hex, e.g. #014b7f
+  logo_url     VARCHAR(255)    NULL,                -- optional service logo under /uploads
   position     INT             NOT NULL DEFAULT 0,  -- display order, lower first
   created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -330,6 +331,7 @@ CREATE TABLE IF NOT EXISTS service_members (
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS recruitment_vacancies (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  public_ref    CHAR(32)        NOT NULL,               -- public application link: /application/<ref>
   community_id  BIGINT UNSIGNED NOT NULL,
   service_id    BIGINT UNSIGNED NULL,               -- NULL = community-wide vacancy
   department_id BIGINT UNSIGNED NULL,               -- optional posting location
@@ -343,6 +345,7 @@ CREATE TABLE IF NOT EXISTS recruitment_vacancies (
   created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uq_recruitment_vacancies_public_ref (public_ref),
   KEY idx_recruitment_vacancies_community (community_id, status, created_at),
   KEY idx_recruitment_vacancies_service (service_id, status),
   KEY idx_recruitment_vacancies_department (department_id),

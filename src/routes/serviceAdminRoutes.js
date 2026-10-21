@@ -115,6 +115,7 @@ function serviceView(service) {
     slug: service.slug,
     description: service.description ?? null,
     colour: service.colour ?? null,
+    logoUrl: service.logo_url ?? null,
     position: service.position,
   }
 }
