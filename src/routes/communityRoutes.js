@@ -229,24 +229,33 @@ router.post('/uploads/logo', requireAnyAuth, imageUploader('logos'))
 router.post('/uploads/image', requireAnyAuth, imageUploader('images'))
 
 // ---------------------------------------------------------------
-// POST /api/community/select   { communityId }  -> sets the cookie
+// POST /api/community/select   { communityId | communitySlug } -> sets the cookie
 // POST /api/community/deselect
 // ---------------------------------------------------------------
 router.post(
   '/community/select',
   requireAuth,
   asyncHandler(async (req, res) => {
-    const communityId = Number(req.body?.communityId)
-    if (!communityId) throw badRequest('communityId is required')
+    const communityId = Number(req.body?.communityId) || null
+    const communitySlug = normaliseSlug(req.body?.communitySlug)
+
+    if (!communityId && !communitySlug) {
+      throw badRequest('communityId or communitySlug is required')
+    }
+    if (communitySlug && !isValidSlug(communitySlug)) {
+      throw badRequest('That community slug is not valid')
+    }
+
+    const community = communityId
+      ? await one('SELECT id, slug, name FROM communities WHERE id = ?', [communityId])
+      : await one('SELECT id, slug, name FROM communities WHERE slug = ?', [communitySlug])
+    if (!community) throw notFound('Community not found')
 
     const membership = await one(
       "SELECT id FROM memberships WHERE user_id = ? AND community_id = ? AND status = 'active'",
-      [req.user.id, communityId],
+      [req.user.id, community.id],
     )
     if (!membership) throw conflict('You are not an active member of that community')
-
-    const community = await one('SELECT id, slug, name FROM communities WHERE id = ?', [communityId])
-    if (!community) throw notFound('Community not found')
 
     setCommunity(res, signCommunity(community.id))
     res.json({ community: { id: community.id, slug: community.slug, name: community.name } })
