@@ -126,11 +126,22 @@ router.get(
       return serviceSummary(access, departmentsByService.get(row.id) || [])
     })
 
+    // Recruitment management can come from a community permission or from a
+    // rank permission inside a service. Keep it separate from `permissions`,
+    // which remains the community-wide list used by the rest of the nav.
+    const canManageRecruitment =
+      global.has('applications.manage') ||
+      serviceRows.some((row) => {
+        const rankPermissions = parsePermissions(row.rank_permissions)
+        return !!row.membership_id && rankPermissions.includes('applications.manage')
+      })
+
     res.json({
       community: publicCommunity(req.community),
       role: req.role,
       permissions: req.permissions,
       services,
+      recruitment: { canManage: canManageRecruitment },
     })
   }),
 )

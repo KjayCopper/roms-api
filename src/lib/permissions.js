@@ -29,8 +29,16 @@ export const RANK_PERMISSION_OPTIONS = [
   },
   { key: 'members.view', label: 'View the service roster', group: 'Members' },
   { key: 'members.manage', label: 'Add members and assign ranks', group: 'Members' },
-  { key: 'applications.view', label: 'View recruitment applications', group: 'Recruitment' },
-  { key: 'applications.manage', label: 'Manage recruitment applications', group: 'Recruitment' },
+  {
+    key: 'applications.view',
+    label: 'View recruitment vacancies and applications',
+    group: 'Recruitment',
+  },
+  {
+    key: 'applications.manage',
+    label: 'Create vacancies and manage applications',
+    group: 'Recruitment',
+  },
 ]
 
 export const RANK_PERMISSIONS = RANK_PERMISSION_OPTIONS.map((option) => option.key)
