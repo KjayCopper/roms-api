@@ -2,8 +2,8 @@
 -- 007 — central recruitment
 --
 -- A vacancy is a posting for a service, department and/or rank.
--- Applications are internal for now; the external/public flow can
--- reuse the same tables later.
+-- Vacancies can be internal, external or both. External applications are
+-- accepted from the public site; internal ones are accepted in the portal.
 --
 -- Scoping follows the existing service rank model:
 --   * community applications.manage -> every vacancy in the community
