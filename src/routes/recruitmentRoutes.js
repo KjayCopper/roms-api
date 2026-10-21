@@ -62,6 +62,15 @@ function cleanDescription(value) {
   return html
 }
 
+// Descriptions written before rich text was introduced are plain text. Keep
+// their line breaks when rendering, instead of collapsing them.
+function normalizeDescription(value) {
+  if (value == null) return null
+  const text = String(value)
+  if (/<[a-z][\s\S]*>/i.test(text)) return text
+  return text.replace(/\r\n|\r|\n/g, '<br>')
+}
+
 // Public application links use a random reference instead of the numeric id,
 // so the id is never published and the links cannot be guessed.
 const PUBLIC_REF_PATTERN = /^[a-f0-9]{32}$/
@@ -183,7 +192,7 @@ function vacancyView(row) {
     publicRef: row.public_ref ?? null,
     applicationUrl: row.public_ref ? `/vacancy/${row.public_ref}` : null,
     title: row.title,
-    description: row.description ?? null,
+    description: normalizeDescription(row.description),
     audience: row.audience,
     status: row.status,
     closesAt: row.closes_at ?? null,
@@ -278,7 +287,7 @@ function publicVacancyView(row) {
     ref: row.public_ref,
     applicationUrl: `/vacancy/${row.public_ref}`,
     title: row.title,
-    description: row.description ?? null,
+    description: normalizeDescription(row.description),
     closesAt: row.closes_at ?? null,
     open: row.is_open === undefined ? true : !!Number(row.is_open),
     service: row.service_id
