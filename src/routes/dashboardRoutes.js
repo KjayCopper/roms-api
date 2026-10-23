@@ -475,6 +475,7 @@ router.delete(
     const role = await one('SELECT * FROM roles WHERE id = ? AND community_id = ?', [req.params.id, req.community.id])
     if (!role) throw notFound('Role not found')
     if (role.is_owner) throw forbidden('The owner role cannot be deleted')
+    if (role.is_default) throw forbidden('The default role cannot be deleted')
 
     const fallback = await one('SELECT id FROM roles WHERE community_id = ? AND is_default = 1 LIMIT 1', [
       req.community.id,
