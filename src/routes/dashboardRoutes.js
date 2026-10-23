@@ -19,6 +19,7 @@ import {
 } from '../lib/util.js'
 import {
   PERMISSIONS,
+  COMMUNITY_ROLE_PERMISSIONS,
   effectivePermissions,
   sanitisePermissions,
   parsePermissions,
@@ -399,7 +400,7 @@ router.get(
       'SELECT id, `key`, name, position, is_owner, is_default, permissions FROM roles WHERE community_id = ? ORDER BY position DESC, name',
       [req.community.id],
     )
-    res.json({ roles: rows.map(roleView), permissions: PERMISSIONS })
+    res.json({ roles: rows.map(roleView), permissions: COMMUNITY_ROLE_PERMISSIONS })
   }),
 )
 
