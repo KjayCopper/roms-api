@@ -17,9 +17,18 @@ export const PERMISSIONS = [
 ]
 
 // Permissions that can be granted to a community role. Service-level
-// permissions (services.*, members.*, applications.*) are deliberately NOT
-// here: they are granted through service ranks, not community roles.
-export const COMMUNITY_ROLE_PERMISSIONS = ['community.settings', 'community.roles']
+// permissions (services.*, applications.*) are deliberately NOT here: they
+// are granted through service ranks, not community roles.
+//
+// members.view / members.manage ARE community-level: they back the community
+// members list, where admins can view a profile and add moderation actions or
+// messages. (Service ranks have their own members.* for the service roster.)
+export const COMMUNITY_ROLE_PERMISSIONS = [
+  'community.settings',
+  'community.roles',
+  'members.view',
+  'members.manage',
+]
 
 export const ALL_PERMISSIONS = [...PERMISSIONS]
 
@@ -63,7 +72,7 @@ export const PRESET_ROLES = [
     position: 80,
     is_owner: 0,
     is_default: 0,
-    permissions: ['community.settings', 'community.roles'],
+    permissions: ['community.settings', 'community.roles', 'members.view', 'members.manage'],
   },
   {
     key: 'moderator',
@@ -71,7 +80,7 @@ export const PRESET_ROLES = [
     position: 50,
     is_owner: 0,
     is_default: 0,
-    permissions: [],
+    permissions: ['members.view'],
   },
   {
     key: 'member',
